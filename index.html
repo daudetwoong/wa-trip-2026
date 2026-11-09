@@ -1,0 +1,682 @@
+<!-- 서호주 남자넷 여행 세 가지 길(캠핑카 북쪽·캠핑카 남쪽·렌터카+숙소) 비교 — 달력 비행줄 + 지도 동선 + 매일 일정 + 항공 자리표 + 날씨 (바르셀로나 계획서 형식) -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서호주 남자넷 · 세 가지 길</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{ --ink:#33312e; --paper:#fbf7ef; --card:#fff; --line:#e6ddcc; --accent:#c96f3f; --sea:#3d7a8c; --ok:#7f9a6d; --warn:#c9903f; --mute:#8a8377; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--paper);color:var(--ink);line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto;padding:20px 14px 80px}
+  h1{font-size:23px;margin:0 0 4px}
+  .sub{color:var(--mute);font-size:13.5px;margin:0 0 14px}
+  h2{font-size:17px;margin:26px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  h2 small{font-weight:400;color:var(--mute);font-size:12.5px}
+  h3{font-size:14.5px;margin:16px 0 6px}
+  .bar{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:13.5px}
+  .bar b{color:var(--accent)}
+  .tabs{display:flex;gap:8px;margin:14px 0 6px}
+  .tabs button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 6px;font:inherit;font-size:13.5px;font-weight:700;color:var(--mute);cursor:pointer;line-height:1.3}
+  .tabs button small{display:block;font-weight:400;font-size:11.5px}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tabs button.on small{color:#ddd}
+  table.cmp{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cmp th,.cmp td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .cmp th{background:#f3eee3;font-weight:700;white-space:nowrap}
+  .cmp tr:last-child td{border-bottom:none}
+  .cmp td.hi{font-weight:700;color:var(--accent)}
+  .scroll{overflow-x:auto}
+  /* 달력 */
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;min-width:640px}
+  .cal .wd{font-size:11px;color:var(--mute);text-align:center;font-weight:700;padding:2px 0}
+  .cell{background:var(--card);border:1px solid var(--line);border-radius:10px;min-height:92px;padding:5px 4px 6px;font-size:11px;min-width:0;overflow:hidden}
+  .cell.off{background:transparent;border-style:dashed;opacity:.45;min-height:40px}
+  .cell .dn{font-weight:800;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
+  .cell .dn .sleep{font-weight:600;font-size:10px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62%}
+  .fl{margin-top:4px;border-left:4px solid #999;background:#f7f4ed;border-radius:4px;padding:2px 4px;line-height:1.3;min-width:0}
+  .fl b{font-size:11px;letter-spacing:-.3px;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis}
+  .fl span{display:block;color:var(--mute);font-size:9.5px;white-space:normal}
+  .fl.drive{border-left-style:dotted;background:transparent;color:var(--mute)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--mute);margin:8px 2px 0}
+  .legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+  .callist{display:none}
+  .callist .row{display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 9px;margin-bottom:5px;font-size:12px}
+  .callist .row .d{flex:0 0 64px;font-weight:800;font-size:13px}
+  .callist .row .d small{display:block;font-weight:600;color:var(--mute);font-size:10.5px}
+  .callist .row .fls{flex:1;min-width:0}
+  .callist .fl{margin:0 0 4px}
+  .callist .fl b,.callist .fl span{white-space:normal}
+  @media (max-width:640px){ .calwrap{display:none} .callist{display:block} }
+  /* 지도 */
+  .mapbtns{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}
+  .mapbtns button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--mute)}
+  .mapbtns button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #map{height:460px;width:100%;border-radius:14px;border:1px solid var(--line);background:#e9eef2}
+  .num{border:2px solid #fff;border-radius:50%;color:#fff;width:24px;height:24px;line-height:20px;text-align:center;font-weight:700;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .pop b{font-size:14px}.pop .m{color:#666;font-size:12px}
+  .aplabel{background:rgba(255,255,255,.9);border:1px solid #999;border-radius:6px;padding:1px 6px;font-weight:700;font-size:12px;white-space:nowrap}
+  .mapnote{font-size:12px;color:var(--mute);margin-top:6px}
+  /* 매일 일정 */
+  .day{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:11px}
+  .day.fly{background:#f0f5f6;border-color:#cfe0e4}
+  .day.stop{background:#fbf3e4;border-color:#eedcb8}
+  .dh{font-weight:700;font-size:15px;margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:baseline;gap:7px}
+  .dh .dt{color:var(--accent)} .day.fly .dh .dt{color:var(--sea)} .day.stop .dh .dt{color:var(--warn)}
+  .pill{font-size:11px;color:#fff;background:var(--accent);border-radius:6px;padding:1px 7px;white-space:nowrap}
+  .pill.sea{background:var(--sea)} .pill.ok{background:var(--ok)} .pill.warn{background:var(--warn)} .pill.gray{background:#999}
+  ul{margin:4px 0 2px;padding-left:18px} li{margin:3px 0;font-size:14px}
+  .tip{font-size:12.5px;color:var(--mute);margin-top:5px;border-top:1px dashed var(--line);padding-top:5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:11px}
+  .pc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:520px){.pc{grid-template-columns:1fr}}
+  .pc h4{margin:0 0 4px;font-size:13.5px}
+  .pc ul{margin:0} .pc li{font-size:13px}
+  a{color:var(--accent)}
+  .foot{font-size:12.5px;color:var(--mute);margin-top:22px;border-top:1px dashed var(--line);padding-top:10px}
+  /* 좌석표 */
+  details.seat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 12px;margin-bottom:8px}
+  details.seat summary{cursor:pointer;font-size:14px;padding:4px 0}
+  details.seat summary small{color:var(--mute);font-weight:400;margin-left:6px}
+  table.seat{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px;min-width:520px}
+  table.seat th,table.seat td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  table.seat th{color:var(--mute);font-weight:600;font-size:11.5px}
+  table.seat td.t{font-weight:700;font-variant-numeric:tabular-nums}
+  table.seat td.n{text-align:center;font-variant-numeric:tabular-nums}
+  table.seat td.m{color:var(--mute)}
+  table.seat i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  table.wx{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:560px}
+  .wx th,.wx td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  .wx th{background:#f3eee3;font-weight:700}
+  .wx tr:last-child td{border-bottom:none}
+  .grp{margin-bottom:10px} .grp b{display:block;font-size:13.5px;margin-bottom:3px}
+  .grp span{display:inline-block;font-size:12.5px;background:#f3eee3;border-radius:6px;padding:1px 7px;margin:2px 3px 2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🇦🇺 서호주 남자넷 · 세 가지 길</h1>
+  <p class="sub">11/24(화) 출발 ~ 12/4(금) 인천 도착 · 한국↔시드니는 각자 자사편(아시아나 3 · 대한항공 1) · 시드니↔퍼스는 직원표 · 서호주 7박</p>
+
+  <div class="bar">🧭 <b>어떻게 보나요</b> — 위에서 길을 하나 고르면 ① 달력에 비행기가 <b>색깔 줄</b>로 한 줄씩 뜨고 ② 지도에 하늘길·시드니 하루·서호주 동선이 번호로 찍히고 ③ 아래에 하루하루 일정이 나옵니다. <b>비행편은 예시입니다.</b> 시각은 실제 운항 시각이지만 어느 편을 탈지는 아직 정한 게 아니에요. 자리 색은 11/10 새벽 myIDTravel 화면 실측입니다.</div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <h2>📊 세 길 한눈에</h2>
+  <div class="scroll"><table class="cmp">
+    <thead><tr><th></th><th>옵션 1 · 캠핑카 북쪽</th><th>옵션 2 · 캠핑카 남쪽</th><th>옵션 3 · 렌터카 + 숙소</th></tr></thead>
+    <tbody>
+      <tr><th>어디를</th><td class="hi">피너클스 · 바다사자 · 분홍 호수 · 칼바리 협곡</td><td>마가렛 리버 와이너리 · 동굴 · 큰 나무 숲 · 앨버니 절벽</td><td>프리맨틀 · 로트네스트 섬(쿼카·스노클) · 마가렛 리버</td></tr>
+      <tr><th>어떻게 자나</th><td>6인용 캠핑카(Mighty Big Six) 6박 + 마지막 밤 캐빈</td><td>같은 캠핑카 6박 + 캐빈</td><td class="hi">캠핑장 캐빈(작은 집) · 짐 두 번만 옮김</td></tr>
+      <tr><th>운전</th><td>총 1,360km · 가장 긴 날 4시간</td><td>총 1,270km · 가장 긴 날 4시간 반</td><td class="hi">총 약 960km · 가장 긴 날 3시간</td></tr>
+      <tr><th>낮 날씨(이맘때 10년 평균)</th><td>26~29° · 열흘에 하루 반은 35° 넘음 · 비 거의 없음</td><td class="hi">21~23° · 걷기 좋음 · 닷새에 하루 비</td><td>프리맨틀 25° · 마가렛 리버 22°</td></tr>
+      <tr><th>밤(캠핑카·캐빈)</th><td class="hi">17~18° 따뜻</td><td>11~13° · 펨버턴 숲은 6~8°까지</td><td>캐빈이라 상관 없음</td></tr>
+      <tr><th>바다</th><td class="hi">21~22° · 스노클은 아침에</td><td>19~20° · 서핑 파도 2.5m(웻슈트)</td><td>로트네스트 20~21° · 섬 안쪽 만은 잔잔</td></tr>
+      <tr><th>1인 비용(항공 빼고)</th><td>약 71만 원</td><td>약 71만 원</td><td>약 71만 원</td></tr>
+      <tr><th>이런 사람에게</th><td>"와!" 하는 풍경, 차째 가서 자는 맛, 더위 괜찮다</td><td>술(와인·맥주)과 숲, 선선한 날씨가 좋다</td><td>매일 침대, 운전 적게, 섬에서 쿼카·스노클</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 id="h-cal">📅 달력에 비행기 한 줄씩 <small>줄 색 = 항공사 · 시각은 그 도시 시간 · 🛏 = 그날 밤 자는 곳</small></h2>
+  <div class="scroll calwrap"><div class="cal" id="cal"></div></div>
+  <div class="callist" id="callist"></div>
+  <div class="legend" id="legend"></div>
+
+  <h2>🗺️ 지도 동선 <small>번호 = 가는 순서 · 점 찍으면 설명</small></h2>
+  <div class="mapbtns" id="mapbtns"></div>
+  <div id="map"></div>
+  <div class="mapnote" id="mapnote"></div>
+
+  <h2>📋 매일 일정</h2>
+  <div id="days"></div>
+
+  <h2>⚖️ 이 길의 좋은 점 · 아쉬운 점</h2>
+  <div class="card pc" id="pc"></div>
+
+  <h2>✈️ 항공 시간 · 자리 표 <small>11/10 새벽 myIDTravel 실측 · 🟢 좋음 🟠 보통 🔴 낮음 · 숫자 = 팔 수 있는 자리(9+ = 9석 이상)</small></h2>
+  <div class="bar" style="font-size:13px">
+    <b>한국 ↔ 시드니(각자 자사편)</b> — 아시아나 3명 OZ601 11/24 20:00 인천 → 11/25 08:20 시드니, 귀국 OZ602 12/4 10:20 시드니 → 19:00 인천(겨울 시간표 기준, <b>사내 시스템으로 확인</b>, myIDTravel에는 안 나옴). 대한항공 1명 KE401 11/25 08:00 → 20:05 시드니 🟢, 귀국 KE402 12/3 21:55 → 12/4 06:35 인천 🟠.<br>
+    <b>시드니 ↔ 퍼스 직원표 값(편도 1인)</b> — 콴타스 155 AUD · 젯스타 약 130 AUD · 버진 약 104 AUD. 왕복 약 14~29만 원. 버진은 등급별 자리가 화면에 안 떠서 색만 있어요.
+  </div>
+  <details class="seat" open><summary><b>인천 → 시드니</b> · 11/25 <small>2편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">08:00</td><td class="t">20:05</td><td><i style="background:#2f7fc1"></i>대한항공 KE401</td><td class="m">781</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">21:50</td><td class="t">10:05+1</td><td><i style="background:#ff6a00"></i>젯스타 JQ048</td><td class="m">788</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">9+</td></tr>
+</tbody></table></div></details>
+<details class="seat"><summary><b>시드니 → 퍼스</b> · 11/25 <small>14편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">06:15</td><td class="t">08:15</td><td><i style="background:#e0001b"></i>콴타스 QF641</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">9+</td></tr>
+<tr><td class="t">06:15</td><td class="t">08:20</td><td><i style="background:#6a1b9a"></i>버진 VA549</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">07:15</td><td class="t">09:20</td><td><i style="background:#6a1b9a"></i>버진 VA551</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">08:10</td><td class="t">10:15</td><td><i style="background:#e0001b"></i>콴타스 QF643</td><td class="m">73H</td><td>🟠 보통</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">09:15</td><td class="t">11:20</td><td><i style="background:#6a1b9a"></i>버진 VA555</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">10:25</td><td class="t">12:30</td><td><i style="background:#e0001b"></i>콴타스 QF645</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+<tr><td class="t">11:45</td><td class="t">13:45</td><td><i style="background:#ff6a00"></i>젯스타 JQ986</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">12:20</td><td class="t">14:20</td><td><i style="background:#e0001b"></i>콴타스 QF649</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">6</td></tr>
+<tr><td class="t">12:25</td><td class="t">14:30</td><td><i style="background:#6a1b9a"></i>버진 VA557</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">16:25</td><td class="t">18:25</td><td><i style="background:#e0001b"></i>콴타스 QF651</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">18:15</td><td class="t">20:20</td><td><i style="background:#6a1b9a"></i>버진 VA567</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">18:30</td><td class="t">20:30</td><td><i style="background:#e0001b"></i>콴타스 QF653</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">4</td></tr>
+<tr><td class="t">19:45</td><td class="t">21:45</td><td><i style="background:#e0001b"></i>콴타스 QF655</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">19:50</td><td class="t">21:45</td><td><i style="background:#ff6a00"></i>젯스타 JQ988</td><td class="m">32N</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+</tbody></table></div></details>
+<details class="seat" open><summary><b>시드니 → 퍼스</b> · 11/26 <small>14편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">06:15</td><td class="t">08:15</td><td><i style="background:#e0001b"></i>콴타스 QF641</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">9+</td></tr>
+<tr><td class="t">06:15</td><td class="t">08:20</td><td><i style="background:#6a1b9a"></i>버진 VA549</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">07:15</td><td class="t">09:20</td><td><i style="background:#6a1b9a"></i>버진 VA551</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">08:10</td><td class="t">10:10</td><td><i style="background:#e0001b"></i>콴타스 QF643</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">09:15</td><td class="t">11:20</td><td><i style="background:#6a1b9a"></i>버진 VA555</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">10:25</td><td class="t">12:30</td><td><i style="background:#e0001b"></i>콴타스 QF645</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+<tr><td class="t">11:45</td><td class="t">13:45</td><td><i style="background:#ff6a00"></i>젯스타 JQ986</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">12:20</td><td class="t">14:20</td><td><i style="background:#e0001b"></i>콴타스 QF649</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">8</td></tr>
+<tr><td class="t">12:25</td><td class="t">14:30</td><td><i style="background:#6a1b9a"></i>버진 VA557</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">15:55</td><td class="t">17:55</td><td><i style="background:#e0001b"></i>콴타스 QF651</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">18:15</td><td class="t">20:20</td><td><i style="background:#6a1b9a"></i>버진 VA567</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">18:30</td><td class="t">20:30</td><td><i style="background:#e0001b"></i>콴타스 QF653</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">19:45</td><td class="t">21:45</td><td><i style="background:#e0001b"></i>콴타스 QF655</td><td class="m">73H</td><td>🟠 보통</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">20:15</td><td class="t">22:20</td><td><i style="background:#6a1b9a"></i>버진 VA569</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+</tbody></table></div></details>
+<details class="seat"><summary><b>시드니 → 퍼스</b> · 11/27 <small>16편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">06:15</td><td class="t">08:15</td><td><i style="background:#e0001b"></i>콴타스 QF641</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">8</td></tr>
+<tr><td class="t">06:15</td><td class="t">08:20</td><td><i style="background:#6a1b9a"></i>버진 VA549</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">07:15</td><td class="t">09:20</td><td><i style="background:#6a1b9a"></i>버진 VA551</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">08:10</td><td class="t">10:10</td><td><i style="background:#e0001b"></i>콴타스 QF643</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">1</td></tr>
+<tr><td class="t">09:15</td><td class="t">11:20</td><td><i style="background:#6a1b9a"></i>버진 VA555</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">10:25</td><td class="t">12:30</td><td><i style="background:#e0001b"></i>콴타스 QF645</td><td class="m">32Q</td><td>🟠 보통</td><td class="n">9+</td><td class="n">4</td></tr>
+<tr><td class="t">11:45</td><td class="t">13:45</td><td><i style="background:#ff6a00"></i>젯스타 JQ986</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">12:20</td><td class="t">14:20</td><td><i style="background:#e0001b"></i>콴타스 QF649</td><td class="m">32Q</td><td>🟠 보통</td><td class="n">9+</td><td class="n">6</td></tr>
+<tr><td class="t">12:25</td><td class="t">14:30</td><td><i style="background:#6a1b9a"></i>버진 VA557</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">13:25</td><td class="t">15:30</td><td><i style="background:#6a1b9a"></i>버진 VA559</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">16:25</td><td class="t">18:25</td><td><i style="background:#e0001b"></i>콴타스 QF651</td><td class="m">73H</td><td>🟠 보통</td><td class="n">6</td><td class="n">2</td></tr>
+<tr><td class="t">18:15</td><td class="t">20:20</td><td><i style="background:#6a1b9a"></i>버진 VA567</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">18:30</td><td class="t">20:30</td><td><i style="background:#e0001b"></i>콴타스 QF653</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">2</td></tr>
+<tr><td class="t">19:45</td><td class="t">21:45</td><td><i style="background:#e0001b"></i>콴타스 QF655</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">4</td></tr>
+<tr><td class="t">19:50</td><td class="t">21:45</td><td><i style="background:#ff6a00"></i>젯스타 JQ988</td><td class="m">32N</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">20:15</td><td class="t">22:20</td><td><i style="background:#6a1b9a"></i>버진 VA569</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+</tbody></table></div></details>
+<details class="seat"><summary><b>퍼스 → 시드니</b> · 12/2 <small>14편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">05:00</td><td class="t">12:10</td><td><i style="background:#e0001b"></i>콴타스 QF642</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+<tr><td class="t">05:55</td><td class="t">13:10</td><td><i style="background:#6a1b9a"></i>버진 VA550</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">2</td></tr>
+<tr><td class="t">08:10</td><td class="t">15:20</td><td><i style="background:#e0001b"></i>콴타스 QF644</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+<tr><td class="t">09:05</td><td class="t">16:20</td><td><i style="background:#6a1b9a"></i>버진 VA554</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">7</td></tr>
+<tr><td class="t">09:15</td><td class="t">16:25</td><td><i style="background:#e0001b"></i>콴타스 QF646</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+<tr><td class="t">11:20</td><td class="t">18:30</td><td><i style="background:#e0001b"></i>콴타스 QF648</td><td class="m">73H</td><td>🟠 보통</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">11:35</td><td class="t">18:40</td><td><i style="background:#e0001b"></i>콴타스 QF034</td><td class="m">789</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">9+</td></tr>
+<tr><td class="t">12:15</td><td class="t">19:30</td><td><i style="background:#6a1b9a"></i>버진 VA560</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">13:35</td><td class="t">20:45</td><td><i style="background:#e0001b"></i>콴타스 QF650</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">7</td></tr>
+<tr><td class="t">14:45</td><td class="t">22:00</td><td><i style="background:#ff6a00"></i>젯스타 JQ987</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">15:15</td><td class="t">22:30</td><td><i style="background:#6a1b9a"></i>버진 VA562</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">15:20</td><td class="t">22:30</td><td><i style="background:#e0001b"></i>콴타스 QF652</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">8</td></tr>
+<tr><td class="t">22:40</td><td class="t">06:05+1</td><td><i style="background:#ff6a00"></i>젯스타 JQ989</td><td class="m">32N</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">22:55</td><td class="t">06:05+1</td><td><i style="background:#e0001b"></i>콴타스 QF654</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">5</td></tr>
+</tbody></table></div></details>
+<details class="seat" open><summary><b>퍼스 → 시드니</b> · 12/3 <small>15편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">05:00</td><td class="t">12:10</td><td><i style="background:#e0001b"></i>콴타스 QF642</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">8</td></tr>
+<tr><td class="t">06:00</td><td class="t">13:15</td><td><i style="background:#6a1b9a"></i>버진 VA550</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">08:10</td><td class="t">15:20</td><td><i style="background:#e0001b"></i>콴타스 QF644</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">2</td></tr>
+<tr><td class="t">09:05</td><td class="t">16:20</td><td><i style="background:#6a1b9a"></i>버진 VA554</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+<tr><td class="t">09:15</td><td class="t">16:25</td><td><i style="background:#e0001b"></i>콴타스 QF646</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">7</td></tr>
+<tr><td class="t">10:10</td><td class="t">17:25</td><td><i style="background:#6a1b9a"></i>버진 VA556</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">11:20</td><td class="t">18:30</td><td><i style="background:#e0001b"></i>콴타스 QF648</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">12:15</td><td class="t">19:30</td><td><i style="background:#6a1b9a"></i>버진 VA560</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">13:35</td><td class="t">20:45</td><td><i style="background:#e0001b"></i>콴타스 QF650</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">7</td></tr>
+<tr><td class="t">14:45</td><td class="t">22:00</td><td><i style="background:#ff6a00"></i>젯스타 JQ987</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">없음</td></tr>
+<tr><td class="t">15:15</td><td class="t">22:30</td><td><i style="background:#6a1b9a"></i>버진 VA562</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">15:20</td><td class="t">22:30</td><td><i style="background:#e0001b"></i>콴타스 QF652</td><td class="m">32Q</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">8</td></tr>
+<tr><td class="t">22:55</td><td class="t">06:05+1</td><td><i style="background:#e0001b"></i>콴타스 QF654</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">7</td></tr>
+<tr><td class="t">22:55</td><td class="t">06:10+1</td><td><i style="background:#6a1b9a"></i>버진 VA570</td><td class="m">7M8</td><td>🟢 좋음</td><td class="n">색만 표시</td><td class="n">–</td></tr>
+<tr><td class="t">23:45</td><td class="t">06:55+1</td><td><i style="background:#e0001b"></i>콴타스 QF658</td><td class="m">73H</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">6</td></tr>
+</tbody></table></div></details>
+<details class="seat" open><summary><b>시드니 → 인천</b> · 12/3 <small>2편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">11:40</td><td class="t">20:15</td><td><i style="background:#ff6a00"></i>젯스타 JQ047</td><td class="m">788</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">3</td></tr>
+<tr><td class="t">21:55</td><td class="t">06:35+1</td><td><i style="background:#2f7fc1"></i>대한항공 KE402</td><td class="m">781</td><td>🟠 보통</td><td class="n">9+</td><td class="n">0</td></tr>
+</tbody></table></div></details>
+<details class="seat"><summary><b>시드니 → 인천</b> · 12/4 <small>2편</small></summary>
+<div class="scroll"><table class="seat"><thead><tr><th>출발</th><th>도착</th><th>항공사 · 편</th><th>기종</th><th>가능성</th><th>이코노미</th><th>비즈니스</th></tr></thead><tbody>
+<tr><td class="t">11:40</td><td class="t">20:15</td><td><i style="background:#ff6a00"></i>젯스타 JQ047</td><td class="m">788</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">9+</td></tr>
+<tr><td class="t">21:55</td><td class="t">06:35+1</td><td><i style="background:#2f7fc1"></i>대한항공 KE402</td><td class="m">781</td><td>🟢 좋음</td><td class="n">9+</td><td class="n">0</td></tr>
+</tbody></table></div></details>
+
+  <h2>🌤️ 날씨 <small>지난 10년 같은 날짜(11/26~12/3) 실제 기록 평균 · 여행 날짜 예보는 출발 5일 전부터</small></h2>
+  <div class="scroll"><table class="wx">
+    <thead><tr><th>곳</th><th>낮 최고</th><th>밤 최저</th><th>비 온 날</th><th>35° 넘는 날</th><th>바다 물</th><th>한 줄</th></tr></thead>
+    <tbody>
+      <tr><td>퍼스 · 프리맨틀</td><td>25~26°</td><td>16°</td><td>8%</td><td>4~6%</td><td>21°</td><td>딱 좋음. 오후 바닷바람 셈</td></tr>
+      <tr><td>로트네스트 섬</td><td>21°</td><td>17°</td><td>2%</td><td>0%</td><td>20.5°</td><td>섬 안쪽 만에서 스노클</td></tr>
+      <tr><td>서반테스 · 주리엔베이</td><td>26~27°</td><td>17°</td><td>8~9%</td><td>10%</td><td>21~22°</td><td>아침 스노클, 오후 돌풍 55~60km/h</td></tr>
+      <tr><td>칼바리 · 제럴턴</td><td>28~29°</td><td>18°</td><td>1~2%</td><td>15~18%</td><td>21.7°</td><td>협곡 걷기는 11시 전에 끝내기</td></tr>
+      <tr><td>버셀턴 · 마가렛 리버</td><td>22~25°</td><td>13°</td><td>5~15%</td><td>0~1%</td><td>19.5°</td><td>걷기 좋음, 서핑은 웻슈트</td></tr>
+      <tr><td>펨버턴 · 왈폴 · 앨버니</td><td>20~23°</td><td>11~13°</td><td>19~21%</td><td>0%</td><td>–</td><td>캠핑카 새벽 6~8°, 침낭·긴옷</td></tr>
+    </tbody>
+  </table></div>
+  <div class="card" style="font-size:13px;margin-top:10px">
+    ☀️ <b>자외선이 아주 세요.</b> 퍼스 실측 하루 최고 평균 11.2(11 이상 = 극도로 높음). 선크림 SPF50+ 2시간마다, 챙 넓은 모자, 래시가드.<br>
+    🪰 <b>파리(bush flies).</b> 북쪽 내륙에서 얼굴에 달라붙어요. 마트에서 파는 얼굴 그물망(fly net) 하나씩.<br>
+    🌅 해 뜨는 시각 약 05:00, 해 지는 시각 약 19:10. 사진은 새벽과 저녁 7시 전후.<br>
+    🔄 출발 5일 전(11/21쯤) 예보를 다시 보고, 산불·더위 경보는 호주 기상청(bom.gov.au)에서.
+  </div>
+
+  <h2>🚐 미리 알아둘 것 <small>조사에서 나온 실제 규칙</small></h2>
+  <div class="card" style="font-size:13.5px">
+    <div class="grp"><b>캠핑카(옵션 1·2)</b>
+      <span>4인용은 남자 넷에 좁음 → 6인용</span><span>Mighty Big Six 7일 1,316 AUD(12/2 반납)</span><span>면책 0원 Value Pack 72 AUD/일(추가 운전자 포함)</span><span>지점은 공항 밖 Redcliffe, 셔틀 없음(우버)</span><span>문 9:00~15:30, 반납은 14:30까지</span><span>비포장은 12km 미만 다진 길만</span><span>캥거루 때문에 해 지면 운전 금지</span><span>기름 반 남으면 넣기(제럴턴→칼바리 155km 빈 구간)</span><span>금·토 캠핑장 미리 예약(서반테스 전기 자리 1~5개 남음)</span>
+    </div>
+    <div class="grp"><b>렌터카(옵션 3)</b>
+      <span>No Birds 7인승 SUV 무제한 483 AUD</span><span>면책 0원 15 AUD/일</span><span>3열 접고 4명 타면 가방 OK</span><span>공항↔사무실 셔틀 5 AUD</span><span>큰 회사(허츠 등)는 사내 직원 할인 확인</span>
+    </div>
+    <div class="grp"><b>남쪽 주의</b>
+      <span>고3 졸업 축제(Leavers) 11/23~26 버셀턴·던스보로</span><span>RAC 캠핑장 11/26·27 도착 예약 막힘</span><span>그래서 남쪽은 11/27부터 들어감</span>
+    </div>
+    <div class="grp"><b>공통</b>
+      <span>왼쪽 운전, 첫날이 가장 위험</span><span>술은 보틀숍에서만, 여권 지참, 공공장소 음주 금지</span><span>음주운전 0.05%</span><span>물 1인 하루 4L</span><span>북쪽은 휴대폰 신호 끊김 → 오프라인 지도</span><span>로트네스트 배 왕복 87.5 AUD(입장료 포함)</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    비행편 시각은 2026-11-10 조사 기준 실제 운항 시각이지만 <b>어느 편을 탈지는 아직 정한 게 아닙니다</b>(예시). 아시아나 편 시각은 공개 시간표(AeroRoutes 겨울 필링)라 사내 확인이 필요합니다. 식당·카페·바·액티비티는 <b>구글 4.5점·후기 100개 이상 126곳만</b> 넣었고(306곳 중), 시드니 하루는 동네 이름만 적었습니다(평점 검증 전). 영업시간은 11/10 주 기준이라 가기 전 한 번 더 확인. 비용은 실견적(THL·No Birds·G'day Parks·RAC) 기준이고 연료는 가정, 장보기·식사·입장료는 빼고 계산했습니다.
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ===== 공통 자료 =====
+var AIR={OZ:{n:'아시아나',c:'#b5283b'},KE:{n:'대한항공',c:'#2f7fc1'},QF:{n:'콴타스',c:'#e58e26'}};
+var AP={ICN:{n:'인천',lat:37.4602,lng:126.4407},SYD:{n:'시드니',lat:-33.9399,lng:151.1753},PER:{n:'퍼스',lat:-31.9403,lng:115.9669}};
+var WEEKS=[['11/23','11/24','11/25','11/26','11/27','11/28','11/29'],['11/30','12/01','12/02','12/03','12/04','12/05','12/06']];
+var TRIP=['11/24','11/25','11/26','11/27','11/28','11/29','11/30','12/01','12/02','12/03','12/04'];
+var WD={'11/23':'월','11/24':'화','11/25':'수','11/26':'목','11/27':'금','11/28':'토','11/29':'일','11/30':'월','12/01':'화','12/02':'수','12/03':'목','12/04':'금','12/05':'토','12/06':'일'};
+
+// 비행편(세 옵션 공통, 예시)
+var FLIGHTS=[
+  {day:'11/24',al:'OZ',dep:'20:00',f:'ICN',t:'SYD',ad:'11/25',arr:'08:20',no:'OZ601 · 3명',load:'사내 확인'},
+  {day:'11/25',al:'KE',dep:'08:00',f:'ICN',t:'SYD',ad:'11/25',arr:'20:05',no:'KE401 · 1명',load:'🟢 Y 9+'},
+  {day:'11/26',al:'QF',dep:'06:15',f:'SYD',t:'PER',ad:'11/26',arr:'08:15',no:'QF641 · 4명',load:'🟢 Y 9+ · J 9+'},
+  {day:'12/03',al:'QF',dep:'09:15',f:'PER',t:'SYD',ad:'12/03',arr:'16:25',no:'QF646 · 4명',load:'🟢 Y 9+ · J 7'},
+  {day:'12/03',al:'KE',dep:'21:55',f:'SYD',t:'ICN',ad:'12/04',arr:'06:35',no:'KE402 · 1명',load:'🟠 Y 9+'},
+  {day:'12/04',al:'OZ',dep:'10:20',f:'SYD',t:'ICN',ad:'12/04',arr:'19:00',no:'OZ602 · 3명',load:'사내 확인'}
+];
+var SKY=[['ICN','SYD','OZ'],['SYD','PER','QF'],['PER','SYD','QF'],['SYD','ICN','KE']];
+
+// 지도 동네 색
+var C={syd:'#8e6c3a',per:'#c96f3f',fre:'#3d7a8c',rot:'#2c6fb3',nor:'#d4a017',kal:'#c0392b',mr:'#7a4fa3',sw:'#2e8b57'};
+var ZONE={syd:'시드니',per:'퍼스',fre:'프리맨틀',rot:'로트네스트 섬',nor:'코럴코스트(서반테스·주리엔·제럴턴)',kal:'칼바리',mr:'마가렛 리버 권역',sw:'남쪽 숲·앨버니'};
+function P(day,name,lat,lng,memo,z){return {day:day,name:name,lat:lat,lng:lng,memo:memo,z:z};}
+function D(d,t,pills,items,tip,cls){return {d:d,t:t,pills:pills||[],items:items,tip:tip||'',cls:cls||''};}
+
+// 시드니 하루(11/25) — 세 옵션 공통
+var SYD_PTS=[
+  P('11/25','시드니 공항 도착 08:20 (아시아나 3명)',-33.9399,151.1753,'짐은 공항 근처 호텔에 맡기고 기차로 시내 15분','syd'),
+  P('11/25','서큘러 키 · 오페라하우스',-33.8568,151.2153,'아침 산책, 하버 브리지 배경 사진','syd'),
+  P('11/25','로열 보타닉 가든 → 미세스 매쿼리 포인트',-33.8600,151.2220,'공짜 전망 포인트','syd'),
+  P('11/25','본다이 → 쿠지 해안 걷기(6km)',-33.8908,151.2743,'버스 333번. 수영 가능(물 20°)','syd'),
+  P('11/25','더 록스 펍 저녁',-33.8599,151.2090,'20:05 도착하는 대한항공 1명과 합류 뒤 늦은 저녁. 식당은 평점 검증 전이라 동네만','syd'),
+  P('11/25','공항 근처 호텔 1박',-33.9330,151.1900,'다음날 06:15 비행이라 공항 옆. 4명 2실','syd')
+];
+var DAY_SYD=D('11/25 수','시드니 하루 · 넷 합류',[['시드니','warn']],[
+  '08:20 아시아나 3명 도착. 공항 근처 호텔에 짐 맡기고 기차로 시내.',
+  '<b>서큘러 키 → 오페라하우스 → 보타닉 가든</b> 산책. 점심은 서큘러 키나 더 록스 쪽.',
+  '오후 <b>본다이 → 쿠지 해안길</b>(6km, 2시간). 물 20°라 수영도 가능.',
+  '20:05 대한항공 1명 도착 → 더 록스에서 늦은 저녁·펍. 자정 전 공항 옆 호텔로.'
+],'내일 06:15 비행이라 늦게까지 마시지 않기. 시드니 식당은 평점 검증 전이라 이름을 안 적었어요.','stop');
+var DAY_OUT=D('11/24 화','출발',[['아시아나 3명','sea']],[
+  '<b>20:00 OZ601 인천 → 시드니</b>(아시아나 3명). 기내 1박.',
+  '대한항공 1명은 내일 아침 08:00 편. 오늘은 집에서 짐 점검.'
+],'ETA 안내. 호주는 전자여행허가(ETA)가 필요해요. 앱으로 20 AUD, 넷 다 미리.','fly');
+var DAY_HOME_KE='12/3 목 21:55 KE402 시드니 → 12/4 06:35 인천(대한항공 1명).';
+var DAY_HOME_OZ='아시아나 3명은 시드니 공항 호텔 1박 → 12/4 10:20 OZ602 → 19:00 인천.';
+var DAY_PER_OUT=D('12/03 목','퍼스 → 시드니 → (대한항공 1명) 인천',[['비행','sea']],[
+  '<b>09:15 QF646 퍼스 → 16:25 시드니</b>(4명 함께). 예시 편이고 12/3 퍼스→시드니는 15편이 있어요(아래 표).',
+  DAY_HOME_KE,
+  DAY_HOME_OZ+' 그날 밤은 공항 호텔(Rydges·Mantra 등) 또는 시내에서 마지막 저녁.'
+],'12/3 22:55 QF654 밤 비행(→ 12/4 06:05 시드니)으로 바꾸면 서호주를 하루 더 쓰고 호텔값도 아껴요. 대신 밤새 비행 뒤 10:20 환승.','fly');
+var DAY_HOME=D('12/04 금','인천 도착',[['귀국','sea']],[
+  '06:35 대한항공 1명 인천 도착.',
+  '10:20 OZ602 시드니 → <b>19:00 인천</b> 아시아나 3명.'
+],'','fly');
+
+// ===== 옵션 1 · 캠핑카 북쪽 코럴코스트 =====
+var OPT1={
+  name:'옵션 1',tag:'캠핑카 북쪽',sub:'피너클스·바다사자·칼바리',
+  summary:'<b>캠핑카(6인용) 북쪽 코럴코스트.</b> 11/26 퍼스에서 차 받아 서반테스 → 제럴턴 → 칼바리(2박) → 동가라 → 프리맨틀, 12/2 오후 반납. 1,360km, 1인 약 71만 원(항공 빼고). 더위(35° 넘는 날 10~18%)와 파리만 각오하면 "와!" 소리가 가장 많이 나는 길.',
+  sleep:{'11/24':'기내(3)·집(1)','11/25':'시드니 공항 옆','11/26':'서반테스 캠핑장','11/27':'제럴턴 캠핑장','11/28':'칼바리 캠핑장','11/29':'칼바리 캠핑장','11/30':'동가라 캠핑장','12/01':'프리맨틀 캠핑장','12/02':'퍼스 공항 옆 캐빈','12/03':'시드니 공항(3)·기내(1)','12/04':'집'},
+  land:[
+    P('11/26','퍼스 공항 → 캠핑카 픽업 (Redcliffe, 9시 문 열림)',-31.9403,115.9669,'우버 10분. Value Pack 보험, 운전자 4명 등록. 장보기는 Midland Woolworths','per'),
+    P('11/26','서반테스 RAC 캠핑장 체크인',-30.5000,115.0700,'전기 사이트 4인 97 AUD. 금·토는 자리 1~5개라 예약 필수','nor'),
+    P('11/26','피너클스 사막 해질녘 (19:10 일몰)',-30.5913,115.1582,'4.7/2,930. 안내센터 9:30~16:30이지만 사막은 해 진 뒤까지. 큰 캠핑카는 주차장에 두고 걷기','nor'),
+    P('11/27','주리엔베이 바다사자 스노클 투어 (오전)',-30.3054,115.0380,'Jurien Bay Adventure Tours 4.8/104. 물 21~22°, 오후엔 바람이 세니 아침','nor'),
+    P('11/27','주리엔베이 제티 점심',-30.3024,115.0362,'4.5/1,106. 캠핑카에서 샌드위치','nor'),
+    P('11/27','제럴턴 HMAS 시드니 II 추모비 일몰',-28.7732,114.6160,'4.8/1,919. 갈매기 645마리 돔, 해군 출신에게 각별. 캠핑장 Sunset Beach 99 AUD','nor'),
+    P('11/28','Saltdish 아침 → 제럴턴 박물관',-28.7683,114.6121,'카페 4.6/489(토 영업). 박물관 4.7/1,228 바타비아호 난파선 유물, 9:30 개장','nor'),
+    P('11/28','Burnt Barrel 점심 (Nabawa, 토 11~16시)',-28.5610,114.7361,'4.6/332 농장 바비큐·맥주. 북쪽 길에서 평점 통과한 유일한 식당','nor'),
+    P('11/28','허트 라군 분홍 호수',-28.1562,114.2389,'4.7/372. 한낮 해 높을 때 가장 분홍','kal'),
+    P('11/28','칼바리 해안 절벽 (Natural Bridge · Island Rock) 일몰',-27.8288,114.1108,'4.7/749 · 4.6/361. 캠핑장 Kalbarri Tudor 68 AUD','kal'),
+    P('11/29','스카이워크 · 네이처스 윈도 (새벽 출발)',-27.5548,114.4340,'4.8/2,842 · 4.8/2,510. 05:30 출발, 11시 전 끝. 물 1인 3L. 40° 넘으면 루프 트레일 닫힘','kal'),
+    P('11/29','Z Bend 전망대',-27.6536,114.4568,'4.8/632. 돌아오는 길에','kal'),
+    P('11/29','칼바리 강 선셋 크루즈',-27.7099,114.1629,'Kalbarri Wilderness Cruises 4.9/244. 오후는 캠핑장 수영장에서 쉬고 저녁 크루즈','kal'),
+    P('11/30','펠리컨 먹이주기 08:45',-27.7069,114.1674,'4.6/338. 아침은 Gorges Cafe 4.7/863(화 휴무)','kal'),
+    P('11/30','동가라 캠핑장 · 해변',-29.2500,114.9330,'220km 2시간 반. Dongara Tourist Park 55 AUD. 월요일이라 쉬는 가게 많음 → 캠핑카 바비큐','nor'),
+    P('12/01','Hangover Bay 아침 수영 (서반테스)',-30.5930,115.1039,'4.5/339 하얀 모래 한적한 해변','nor'),
+    P('12/01','랜슬린 샌드보딩',-31.0021,115.3307,'4.6/2,870. 마을 가게에서 보드 빌림(10 AUD쯤). 8~19시','nor'),
+    P('12/01','프리맨틀 Coogee Beach 캠핑장 → 저녁',-32.0564,115.7460,'383km 4시간. 저녁 Manuka Woodfire 4.7/1,076(화 영업) → Strange Company 4.6/882 칵테일','fre'),
+    P('12/02','프리맨틀 아침 · 감옥 투어',-32.0550,115.7537,'Moore & Moore 4.5/1,661 브런치 → Fremantle Prison 4.7/4,391 (9시)','fre'),
+    P('12/02','캠핑카 반납 14:30 전 (Redcliffe)',-31.9403,115.9669,'기름 가득, 가스 반납. 우버로 시내','per'),
+    P('12/02','킹스 파크 일몰 → 시내 저녁',-31.9609,115.8322,'4.8/28,639 공짜 전망. 저녁 Meat & Wine Co 4.5/3,583 또는 Wildflower 4.5/1,099(수 영업) → 바 Varnish on King 4.5/1,270','per'),
+    P('12/02','퍼스 공항 옆 캐빈 1박',-31.9500,115.9500,'Discovery Parks Perth Airport 4인 268 AUD. 내일 09:15 비행','per')
+  ],
+  days:[DAY_OUT,DAY_SYD,
+    D('11/26 목','퍼스 도착 → 캠핑카 → 피너클스 해질녘',[['캠핑카 1일차','warn'],['211km','gray']],[
+      '08:15 퍼스 도착 → 우버 10분 <b>Redcliffe THL 지점</b>(9시 문 열림). Value Pack 보험(72 AUD/일, 운전자 4명 포함) 가입, 침구·의자 확인.',
+      '11:00 Midland에서 <b>장보기</b>(물 1인 하루 4L, 고기, 얼음, 술은 보틀숍). 왼쪽 운전 첫날이라 천천히.',
+      '14:00 <b>서반테스 RAC 캠핑장</b> 체크인(전기 사이트 97 AUD). 수영장에서 한숨.',
+      '17:30 <b>피너클스 사막</b>(4.7/2,930). 19:10 일몰까지 돌기둥 사이 산책. 밤엔 별.',
+      '저녁은 캠핑장 바비큐. 서반테스의 유명한 Lobster Shack은 3.9점이라 목록에서 뺐어요.'
+    ],'해 지면 캥거루가 길로 나와요. 피너클스에서 캠핑장까지 17km는 해 지기 전에 출발.'),
+    D('11/27 금','바다사자와 수영 → 제럴턴',[['222km','gray']],[
+      '07:30 <b>주리엔베이 바다사자 스노클 투어</b>(Jurien Bay Adventure Tours 4.8/104). 바다사자가 강아지처럼 옆에서 헤엄쳐요. 물 21~22°, 바람 세지기 전 아침.',
+      '12:00 <b>주리엔베이 제티</b>(4.5/1,106)에서 점심.',
+      '13:30 북쪽으로 2시간 반 → 16:00 제럴턴 Sunset Beach 캠핑장(99 AUD).',
+      '18:30 <b>HMAS 시드니 II 추모비</b>(4.8/1,919). 갈매기 645마리 돔은 1941년 전사자 수. 해군 10년 하신 형님께 꼭.',
+      '저녁은 캠핑장 바비큐 또는 마을 펍(평점 미달이라 이름은 안 적음).'
+    ],'금요일이라 캠핑장이 붐벼요. 서반테스·제럴턴 둘 다 오늘 안에 예약.'),
+    D('11/28 토','분홍 호수 → 칼바리',[['166km + 샛길','gray']],[
+      '07:30 <b>Saltdish</b>(4.6/489) 브런치 → 09:30 <b>제럴턴 박물관</b>(4.7/1,228) 바타비아호 난파선.',
+      '11:30 <b>Burnt Barrel</b>(4.6/332, 토 11~16시) 농장 바비큐·수제 맥주 점심. 운전자 빼고.',
+      '14:00 <b>허트 라군 분홍 호수</b>(4.7/372). 해가 높을수록 분홍.',
+      '16:00 칼바리 Tudor 캠핑장(68 AUD) 체크인 → 18:00 <b>Natural Bridge · Island Rock</b> 해안 절벽 일몰.'
+    ],'Burnt Barrel은 금~일 점심만 열어요. 북쪽 길에서 평점 통과한 유일한 식당이라 이날 꼭.'),
+    D('11/29 일','칼바리 협곡 · 강 크루즈',[['캠핑 2일째','ok']],[
+      '05:30 출발 → <b>스카이워크</b>(4.8/2,842, 협곡 위 100m 허공) → <b>네이처스 윈도</b>(4.8/2,510) 루프 트레일. 11시 전 끝. 물 1인 3L, 파리 그물망.',
+      '11:30 <b>Z Bend</b>(4.8/632) 전망대 → 캠핑장 수영장에서 한낮 피하기.',
+      '17:00 <b>칼바리 강 선셋 크루즈</b>(Kalbarri Wilderness Cruises 4.9/244). 맥주 들고.',
+      '저녁 바비큐. 밤 17~18°라 밖에서 마시기 좋아요.'
+    ],'35° 넘는 날이 열흘에 하루 반. 40° 넘으면 루프 트레일이 닫혀요. 더우면 스카이워크만.'),
+    D('11/30 월','칼바리 → 동가라',[['220km','gray']],[
+      '08:45 <b>펠리컨 먹이주기</b>(4.6/338) → <b>Gorges Cafe</b>(4.7/863) 아침.',
+      '10:30 남쪽으로 2시간 반 → 13:00 동가라. 해변 수영, 마을 산책. 캠핑장 55 AUD.',
+      '월요일이라 가게가 많이 쉬어요. 장 봐서 캠핑카 저녁.'
+    ],'느슨한 날. 빨래·주유·정리. 기름은 반 남으면 넣기.'),
+    D('12/01 화','바다 → 모래 언덕 → 프리맨틀',[['383km · 4시간','gray']],[
+      '07:00 출발 → 08:30 <b>Hangover Bay</b>(4.5/339) 아침 수영.',
+      '11:00 <b>랜슬린 샌드보딩</b>(4.6/2,870). 보드는 마을 가게에서 빌림. 1시간이면 충분.',
+      '13:00 남쪽 2시간 → 15:30 프리맨틀 Coogee Beach 캠핑장(92 AUD).',
+      '18:30 <b>Manuka Woodfire Kitchen</b>(4.7/1,076) 장작불 저녁 → <b>Strange Company</b>(4.6/882) 칵테일.'
+    ],'가장 긴 운전날. 운전자 둘이 번갈아. 해 지기 전 프리맨틀 도착이 목표.'),
+    D('12/02 수','프리맨틀 → 반납 → 퍼스 마지막 밤',[['캠핑카 반납','warn']],[
+      '08:00 <b>Moore & Moore</b>(4.5/1,661) 브런치 → 09:30 <b>프리맨틀 감옥</b>(4.7/4,391) 투어.',
+      '12:30 기름 가득 → <b>14:00 Redcliffe 반납</b>(14:30까지). 우버로 시내.',
+      '17:30 <b>킹스 파크</b>(4.8/28,639) 일몰 → 19:30 <b>Meat & Wine Co</b>(4.5/3,583) 고기 실컷, 또는 <b>Wildflower</b>(4.5/1,099) 옥상 코스.',
+      '밤 <b>Varnish on King</b>(4.5/1,270) 위스키 → 우버로 공항 옆 캐빈(268 AUD).'
+    ],'12/2에 반납하면 캠핑카 하루 요금(약 178 AUD)이 줄고, 내일 09:15 비행이 편해요.'),
+    DAY_PER_OUT,DAY_HOME],
+  pros:['피너클스 해질녘·바다사자·분홍 호수·칼바리 협곡, 사진이 가장 많이 나오는 길','비가 거의 안 오고(1~9%) 밤이 따뜻해 캠핑카 밤이 편함','캠핑장이 1박 55~99 AUD로 싸서 숙박비가 가장 적음','차째 가서 자니 짐을 한 번만 풂'],
+  cons:['낮 33~38°, 35° 넘는 날이 열흘에 하루 반. 파리 많음','평점 통과한 식당이 북쪽에 하나뿐(Burnt Barrel) → 저녁은 거의 바비큐','12/1 383km(4시간) 운전','6인용 캠핑카 길이 7m, 왼쪽 운전 첫날 긴장']
+};
+
+// ===== 옵션 2 · 캠핑카 남쪽 =====
+var OPT2={
+  name:'옵션 2',tag:'캠핑카 남쪽',sub:'와이너리·동굴·큰 나무·앨버니',
+  summary:'<b>캠핑카(6인용) 남쪽 마가렛 리버.</b> 고3 졸업 축제(11/23~26) 때문에 11/26은 프리맨틀에서 자고 11/27부터 마가렛 리버(2박) → 펨버턴·왈폴 → 앨버니 → 퍼스. 1,270km, 1인 약 71만 원. 낮 21~23°로 선선하고 와인·맥주·서핑. 숲 밤은 6~8°까지 내려가니 침낭.',
+  sleep:{'11/24':'기내(3)·집(1)','11/25':'시드니 공항 옆','11/26':'프리맨틀 캠핑장','11/27':'마가렛 리버 캠핑장','11/28':'마가렛 리버 캠핑장','11/29':'왈폴 캠핑장','11/30':'앨버니 캠핑장','12/01':'퍼스 공항 옆 캠핑장','12/02':'퍼스 공항 옆 캐빈','12/03':'시드니 공항(3)·기내(1)','12/04':'집'},
+  land:[
+    P('11/26','퍼스 공항 → 캠핑카 픽업 → 장보기',-31.9403,115.9669,'Redcliffe 9시. 왼쪽 운전 첫날은 짧게','per'),
+    P('11/26','코테슬로 해변 → Gibney 점심',-31.9939,115.7510,'해변 4.6/3,934. Gibney 4.6/1,006 해변 앞 그릴','fre'),
+    P('11/26','프리맨틀 Coogee Beach 캠핑장 · 저녁',-32.0564,115.7460,'102 AUD. 저녁 Vin Populi 4.5/1,212 피자·와인 → Otherside Brewing 4.6/322(목 영업)','fre'),
+    P('11/27','버셀턴 제티 · 바닷속 관측실',-33.6445,115.3450,'1.8km 나무 부두 4.6/16,613 · 관측실 4.5/1,478(9~16시)','mr'),
+    P('11/27','Meelup · Bunker Bay 수영',-33.5732,115.0871,'4.8/650 · 4.8/165 잔잔하고 맑음','mr'),
+    P('11/27','Canal Rocks → Injidup 천연 스파',-33.6702,114.9951,'4.8/3,353 · 4.7/1,339 파도가 바위를 뚫는 곳','mr'),
+    P('11/27','Wild Hop 브루어리 → 마가렛 리버 캠핑장',-33.6951,115.0638,'4.6/901 잔디밭 맥주. 캠핑장 Margaret River Tourist Park 98 AUD. 저녁 Morries 4.6/1,765(금 영업)','mr'),
+    P('11/28','Surfers Point 서핑 (아침)',-33.9765,114.9867,'4.8/199 파도 2.5m, 웻슈트. 서핑 스쿨은 평점 재확인 중','mr'),
+    P('11/28','Vasse Felix → Leeuwin Estate 와이너리',-33.8237,115.0480,'4.7/1,053 첫 와이너리 · 4.5/798 잔디밭. 10~17시. 운전자 금주','mr'),
+    P('11/28','Lake Cave 또는 Mammoth Cave',-34.0790,115.0293,'4.8/2,600 동굴 호수 · 4.7/2,784 오디오 가이드','mr'),
+    P('11/28','Brewhouse Margaret River 저녁',-33.9429,115.0748,'4.6/1,566 강가 브루어리. 또는 Miki\'s Open Kitchen 4.7/747 일식 오마카세(예약)','mr'),
+    P('11/29','Jewel Cave → Cape Leeuwin 등대',-34.3750,115.1363,'4.8/3,625 가장 큰 동굴 · 4.6/3,707 인도양과 남극해가 만나는 곳','mr'),
+    P('11/29','펨버턴 Gloucester Tree 오르기',-34.4477,116.0573,'4.5/965 53m 나무 쇠막대 사다리. Gloucester Ridge 4.6/479 와이너리 점심','sw'),
+    P('11/29','왈폴 Coalmine Beach 캠핑장',-34.9800,116.7300,'51.5 AUD. 숲 밤 6~8°, 침낭','sw'),
+    P('11/30','Valley of the Giants 트리 탑 워크',-34.9784,116.8938,'4.7/5,246 40m 나무 위 철제 다리, 9시 개장','sw'),
+    P('11/30','Greens Pool · Elephant Rocks (덴마크)',-35.0239,117.2343,'4.8/2,395 · 4.9/1,465 천연 수영장. 점심 Pepper & Salt 4.8/585(월 휴무라 Mrs Jones 4.5/979)','sw'),
+    P('11/30','앨버니 The Gap · 풍력발전소 일몰',-35.1185,117.8924,'4.8/3,596 절벽 위 철 전망대 · Wind Farm 4.7/605. 캠핑장 Tasman Albany 75 AUD','sw'),
+    P('12/01','National Anzac Centre',-35.0307,117.9122,'4.8/2,984 1차대전 안작 박물관, 9시. 그다음 405km 4시간 반 퍼스로','sw'),
+    P('12/01','퍼스 공항 옆 캠핑장',-31.9500,115.9500,'75 AUD. 저녁은 시내 우버 20분 Meat & Wine Co 4.5/3,583','per'),
+    P('12/02','킹스 파크 → 엘리자베스 키 → 반납',-31.9609,115.8322,'4.8/28,639 · 4.6/22,214. 14:00 Redcliffe 반납','per'),
+    P('12/02','프리맨틀 마지막 저녁',-32.0564,115.7460,'우버 30분. Manuka Woodfire 4.7/1,076 → Strange Company 4.6/882. 공항 옆 캐빈 268 AUD','fre')
+  ],
+  days:[DAY_OUT,DAY_SYD,
+    D('11/26 목','퍼스 도착 → 캠핑카 → 프리맨틀',[['캠핑카 1일차','warn'],['짧게 50km','gray']],[
+      '08:15 도착 → Redcliffe에서 캠핑카(Value Pack 보험) → Midland 장보기.',
+      '12:30 <b>코테슬로 해변</b>(4.6/3,934) → <b>Gibney</b>(4.6/1,006) 해변 앞 점심.',
+      '15:00 프리맨틀 Coogee Beach 캠핑장(102 AUD). 해변 수영.',
+      '18:30 <b>Vin Populi</b>(4.5/1,212) 피자·와인 → <b>Otherside Brewing</b>(4.6/322) 항구 창고 맥주.'
+    ],'남쪽은 고3 졸업 축제(Leavers) 때문에 11/26 캠핑장이 막혀 있어요. 그래서 오늘은 프리맨틀.'),
+    D('11/27 금','버셀턴 → 케이프 → 마가렛 리버',[['291km','gray']],[
+      '07:00 출발 → 09:30 <b>버셀턴 제티</b>(4.6/16,613) 1.8km 걷기 + <b>바닷속 관측실</b>(4.5/1,478).',
+      '12:00 <b>Meelup Beach</b>(4.8/650) 수영·점심 → <b>Canal Rocks</b>(4.8/3,353) → <b>Injidup 천연 스파</b>(4.7/1,339).',
+      '16:00 <b>Wild Hop Brewing</b>(4.6/901) 잔디밭 맥주(운전자 빼고).',
+      '17:30 마가렛 리버 Tourist Park(98 AUD) → 19:00 <b>Morries</b>(4.6/1,765) 저녁.'
+    ],'금요일 저녁 Morries는 예약. 캠핑장도 금·토 예약.'),
+    D('11/28 토','서핑 → 와이너리 → 동굴',[['마가렛 리버 2일째','ok']],[
+      '07:00 <b>Surfers Point</b>(4.8/199)에서 서핑 또는 구경. 파도 2.5m, 웻슈트 대여.',
+      '10:30 <b>Vasse Felix</b>(4.7/1,053) 시음 → 12:30 <b>Rustico at Hayshed Hill</b>(4.7/1,256) 타파스 점심 → <b>Leeuwin Estate</b>(4.5/798).',
+      '15:00 <b>Lake Cave</b>(4.8/2,600) 동굴 안 호수(마지막 투어 시간 확인).',
+      '18:30 <b>Brewhouse Margaret River</b>(4.6/1,566) 강가 저녁, 또는 <b>Miki\'s Open Kitchen</b>(4.7/747, 예약 필수).'
+    ],'와이너리는 10~17시. 운전자는 시음 금지(0.05%). 운전자 한 명이 하루 참고 다음날 바꾸기.'),
+    D('11/29 일','등대 → 큰 나무 → 왈폴',[['254km','gray']],[
+      '08:00 <b>Jewel Cave</b>(4.8/3,625) → 10:00 <b>Cape Leeuwin 등대</b>(4.6/3,707) 두 바다가 만나는 곳.',
+      '12:30 펨버턴 <b>Gloucester Ridge</b>(4.6/479) 와이너리 점심 → 14:00 <b>Gloucester Tree</b>(4.5/965) 53m 나무 오르기(겁 없는 사람만).',
+      '16:30 왈폴 Coalmine Beach 캠핑장(51.5 AUD). 숲 속 조용한 밤.'
+    ],'펨버턴·왈폴 새벽은 6~8°. 침낭·긴옷·바람막이.'),
+    D('11/30 월','나무 위 다리 → 천연 수영장 → 앨버니',[['120km','gray']],[
+      '09:00 <b>트리 탑 워크</b>(4.7/5,246) 40m 높이 철 다리.',
+      '11:30 덴마크 <b>Greens Pool</b>(4.8/2,395) 수영 → <b>Elephant Rocks</b>(4.9/1,465). 점심 <b>Mrs Jones Cafe</b>(4.5/979).',
+      '15:30 앨버니 Tasman 캠핑장(75 AUD) → 17:30 <b>The Gap</b>(4.8/3,596) 파도 폭발 → <b>풍력발전소</b>(4.7/605) 일몰.'
+    ],'월요일이라 Pepper & Salt(4.8)는 쉬어요. 앨버니 저녁은 캠핑카.'),
+    D('12/01 화','안작 센터 → 퍼스로 긴 운전',[['405km · 4시간 반','gray']],[
+      '09:00 <b>National Anzac Centre</b>(4.8/2,984) 1차대전 박물관 1시간 반.',
+      '11:00 출발 → 중간 Williams에서 점심 → 16:30 퍼스 공항 옆 캠핑장(75 AUD).',
+      '18:30 우버로 시내 <b>Meat & Wine Co</b>(4.5/3,583) → <b>Helvetica</b>(4.6/508) 위스키.'
+    ],'앨버니를 빼고 왈폴에서 바로 퍼스로 가면 333km(3시간 반)로 줄어요.'),
+    D('12/02 수','퍼스 하루 → 반납 → 프리맨틀 마지막 밤',[['캠핑카 반납','warn']],[
+      '08:00 <b>Telegram Coffee</b>(4.8/439) → <b>킹스 파크</b>(4.8/28,639) → <b>엘리자베스 키</b>(4.6/22,214).',
+      '13:00 기름 가득 → 14:00 Redcliffe 반납 → 우버 30분 프리맨틀.',
+      '16:00 <b>프리맨틀 감옥</b>(4.7/4,391) 마지막 투어 → 18:30 <b>Manuka Woodfire</b>(4.7/1,076) → <b>Strange Company</b>(4.6/882).',
+      '우버로 공항 옆 캐빈(268 AUD).'
+    ],''),
+    DAY_PER_OUT,DAY_HOME],
+  pros:['낮 21~23°로 걷기·서핑·와이너리에 딱 좋은 날씨','평점 통과한 식당·와이너리·브루어리가 가장 많음(남서부 38곳)','동굴 3개, 53m 나무 오르기, 40m 나무 위 다리처럼 몸으로 노는 게 많음','비포장 걱정 없는 포장길'],
+  cons:['고3 졸업 축제로 11/26은 마가렛 리버에 못 들어감','비 오는 날이 닷새에 하루, 숲 밤은 6~8°','12/1 405km(4시간 반) 운전','바다 물이 19~20°로 차서 스노클보다 서핑(웻슈트) 쪽']
+};
+
+// ===== 옵션 3 · 렌터카 + 숙소 섞기 =====
+var OPT3={
+  name:'옵션 3',tag:'렌터카 + 숙소',sub:'프리맨틀·로트네스트·마가렛 리버',
+  summary:'<b>렌터카(7인승 SUV) + 캠핑장 캐빈.</b> 프리맨틀 3박(로트네스트 섬 하루, 퍼스 시내 하루) → 마가렛 리버 3박 → 퍼스 1박. 약 960km로 운전이 가장 적고 매일 침대에서 잠. 1인 약 71만 원으로 값은 같음. 캠핑카의 "집째 가는 맛"은 없지만 쿼카·스노클·와인이 다 들어감.',
+  sleep:{'11/24':'기내(3)·집(1)','11/25':'시드니 공항 옆','11/26':'프리맨틀 캐빈','11/27':'프리맨틀 캐빈','11/28':'프리맨틀 캐빈','11/29':'마가렛 리버 캐빈','11/30':'마가렛 리버 캐빈','12/01':'마가렛 리버 캐빈','12/02':'퍼스 공항 옆 캐빈','12/03':'시드니 공항(3)·기내(1)','12/04':'집'},
+  land:[
+    P('11/26','퍼스 공항 → No Birds 셔틀 → SUV',-31.9403,115.9669,'7인승 무제한 483 AUD + 면책 0원 15 AUD/일. 3열 접고 가방','per'),
+    P('11/26','프리맨틀 Coogee Beach 캐빈 3박',-32.1100,115.7650,'4인 캐빈 1박 274~367 AUD','fre'),
+    P('11/26','프리맨틀 감옥 → 해양박물관',-32.0550,115.7537,'4.7/4,391 · WA Maritime Museum 4.5/3,651 잠수함 투어','fre'),
+    P('11/26','Vin Populi → Otherside Brewing',-32.0557,115.7428,'4.5/1,212 · 4.6/322(목 영업)','fre'),
+    P('11/27','로트네스트 섬 당일 (배 07:30, 왕복 87.5 AUD)',-32.0060,115.5100,'Rottnest Express 4.8/1,656. 자전거 빌려 섬 한 바퀴 22km','rot'),
+    P('11/27','The Basin → Little Salmon Bay 스노클',-32.0246,115.5251,'4.7/615 · 4.8/1,230 · Parker Point 4.8/530. 물 20.5°, 섬 안쪽 만은 잔잔','rot'),
+    P('11/27','Isola Bar e Cibo 점심 · 쿼카',-31.9973,115.5419,'4.6/2,223 이탈리안. 쿼카 셀카는 만지지 말고','rot'),
+    P('11/27','Wadjemup 등대 → 16:30 배 → Strange Company',-32.0072,115.5043,'4.5/1,037. 저녁 Manuka Woodfire 4.7/1,076(금 영업) → Strange Company 4.6/882','rot'),
+    P('11/28','Caversham 야생동물 공원 (캥거루 먹이주기)',-31.8338,115.9506,'4.6/9,610 9시 개장, 코알라·웜뱃','per'),
+    P('11/28','킹스 파크 → 엘리자베스 키',-31.9609,115.8322,'4.8/28,639 · 4.6/22,214. 점심 Balthazar 4.6/1,621(토 영업)','per'),
+    P('11/28','Zip+Climb Matagarup 다리 오르기',-31.9549,115.8891,'4.9/1,537 다리 꼭대기 → 집라인(토 영업, 예약)','per'),
+    P('11/28','Meat & Wine Co → Sneaky Tony\'s',-31.9546,115.8567,'4.5/3,583 스테이크 → 암호 대고 들어가는 럼 바 4.5/1,212 → Chicho Gelato 4.5/830','per'),
+    P('11/29','버셀턴 제티 → Meelup → Canal Rocks',-33.6445,115.3450,'4.6/16,613 · 4.8/650 · 4.8/3,353. 점심 Yallingup Woodfired Bread 4.8/498(일 휴무라 Simmo\'s 아이스크림 4.6/3,100)','mr'),
+    P('11/29','Wild Hop → 마가렛 리버 캐빈 3박',-33.6951,115.0638,'4.6/901. Discovery Parks Margaret River 캐빈 4인 208~432 AUD. 저녁 Brewhouse 4.6/1,566','mr'),
+    P('11/30','Surfers Point 서핑 레슨 (월)',-33.9765,114.9867,'4.8/199. 서핑 스쿨 평점은 재확인 중(5.0/399로 읽힌 적 있음)','mr'),
+    P('11/30','Vasse Felix → Rustico → Leeuwin Estate → Yahava 커피',-33.8237,115.0480,'4.7/1,053 · 4.7/1,256 · 4.5/798 · 4.5/1,261. 월요일 저녁 Morries·Miki\'s는 쉬니 Brewhouse(매일)','mr'),
+    P('12/01','Jewel Cave → Cape Leeuwin → Glenarty Road 점심',-34.2738,115.0984,'4.8/3,625 · 4.6/3,707 · Glenarty Road 4.8/546 농장 코스(화 휴무 → Lake Cave 뒤 Xanadu 4.5/645)','mr'),
+    P('12/01','Margaret River Distilling 위스키 → 저녁',-33.9415,115.0740,'4.7/372 시음. 저녁 Morries 4.6/1,765(화 영업)','mr'),
+    P('12/02','마가렛 리버 → 코테슬로 해변 일몰 → Gibney',-31.9939,115.7510,'270km 3시간. 4.6/3,934 · Gibney 4.6/1,006. 공항 옆 캐빈 268 AUD, 차 반납은 12/3 아침 셔틀','per')
+  ],
+  days:[DAY_OUT,DAY_SYD,
+    D('11/26 목','퍼스 도착 → SUV → 프리맨틀',[['렌터카','warn'],['짧게 40km','gray']],[
+      '08:15 도착 → No Birds 셔틀(5 AUD) → <b>7인승 SUV</b> 인수(면책 0원 15 AUD/일, 운전자 4명 등록).',
+      '11:00 프리맨틀 Coogee Beach <b>캐빈 3박</b> 짐 풀기(4인 274~367 AUD/박).',
+      '13:00 <b>프리맨틀 감옥</b>(4.7/4,391) 투어 → 15:00 <b>해양박물관</b>(4.5/3,651) 잠수함.',
+      '18:30 <b>Vin Populi</b>(4.5/1,212) → <b>Otherside Brewing</b>(4.6/322).'
+    ],'비행 뒤 첫날은 짧게. 내일 배가 07:30이라 일찍 자기.'),
+    D('11/27 금','로트네스트 섬 하루 · 쿼카 · 스노클',[['섬','sea']],[
+      '07:30 프리맨틀 B-Shed에서 <b>Rottnest Express</b>(4.8/1,656) 25분. 왕복 87.5 AUD(입장료 포함). 자전거 대여.',
+      '09:00 <b>The Basin</b>(4.7/615) 수영 → 11:00 <b>Little Salmon Bay</b>(4.8/1,230) 스노클 코스 → <b>Parker Point</b>(4.8/530).',
+      '13:00 <b>Isola Bar e Cibo</b>(4.6/2,223) 점심. 쿼카는 사진만, 먹이 금지.',
+      '15:00 <b>Wadjemup 등대</b>(4.5/1,037) → 16:30 배 → 18:30 <b>Manuka Woodfire</b>(4.7/1,076) → <b>Strange Company</b>(4.6/882).'
+    ],'물 20.5°라 30분 넘으면 추워요. 스노클 세트는 섬에서 빌려요. 오후엔 바람이 세서 오전에 물놀이.'),
+    D('11/28 토','캥거루 → 퍼스 시내 → 다리 오르기',[['퍼스','ok']],[
+      '09:00 <b>Caversham 야생동물 공원</b>(4.6/9,610) 캥거루 먹이주기·코알라.',
+      '12:00 <b>킹스 파크</b>(4.8/28,639) → 13:30 <b>Balthazar</b>(4.6/1,621) 점심 → <b>엘리자베스 키</b>(4.6/22,214).',
+      '16:00 <b>Zip+Climb Matagarup</b>(4.9/1,537) 다리 꼭대기 올라 집라인(예약).',
+      '19:00 <b>Meat & Wine Co</b>(4.5/3,583) → <b>Sneaky Tony\'s</b>(4.5/1,212, 암호는 인스타에) → <b>Chicho Gelato</b>(4.5/830).'
+    ],'토요일 밤 노스브리지는 붐벼요. 우버로 프리맨틀 복귀 30분.'),
+    D('11/29 일','버셀턴 → 케이프 → 마가렛 리버',[['300km','gray']],[
+      '08:00 출발 → 10:30 <b>버셀턴 제티</b>(4.6/16,613) → 12:00 <b>Meelup Beach</b>(4.8/650) 수영 → <b>Simmo\'s</b>(4.6/3,100) 아이스크림.',
+      '14:30 <b>Canal Rocks</b>(4.8/3,353) → <b>Wild Hop</b>(4.6/901) 맥주.',
+      '17:00 마가렛 리버 Discovery Parks <b>캐빈 3박</b> → 19:00 <b>Brewhouse</b>(4.6/1,566).'
+    ],'일요일이라 Yallingup Woodfired Bread(4.8)는 쉬어요.'),
+    D('11/30 월','서핑 → 와이너리',[['마가렛 리버 2일째','ok']],[
+      '07:30 <b>Surfers Point</b>(4.8/199) 서핑 레슨 2시간(웻슈트 포함). 레슨 업체는 평점 재확인 중.',
+      '11:00 <b>Vasse Felix</b>(4.7/1,053) → 12:30 <b>Rustico at Hayshed Hill</b>(4.7/1,256) 점심 → <b>Leeuwin Estate</b>(4.5/798) → <b>Yahava</b>(4.5/1,261) 커피.',
+      '18:30 저녁 <b>Brewhouse</b>(매일). 월요일은 Morries·Miki\'s가 쉬어요.'
+    ],'운전자 한 명은 시음 금지. 오늘 참은 사람이 내일 마셔요.'),
+    D('12/01 화','동굴 → 등대 → 위스키',[['마가렛 리버 3일째','ok']],[
+      '09:00 <b>Jewel Cave</b>(4.8/3,625) → 11:00 <b>Cape Leeuwin 등대</b>(4.6/3,707).',
+      '13:00 <b>Lake Cave</b>(4.8/2,600) → 14:30 <b>Xanadu</b>(4.5/645) 늦은 점심(Glenarty Road 4.8은 화 휴무).',
+      '16:30 <b>Margaret River Distilling</b>(4.7/372) 위스키 시음 → 19:00 <b>Morries</b>(4.6/1,765) 또는 <b>Miki\'s</b>(4.7/747 예약).'
+    ],''),
+    D('12/02 수','퍼스로 → 코테슬로 일몰',[['270km · 3시간','gray']],[
+      '09:00 출발 → 12:30 퍼스 공항 옆 캐빈(268 AUD) 짐 두기.',
+      '15:00 <b>Scarborough</b>(4.7/1,730) 또는 <b>코테슬로</b>(4.6/3,934) 해변 → 19:10 일몰 → <b>Gibney</b>(4.6/1,006) 저녁.',
+      '차는 내일 아침 No Birds 반납(셔틀로 공항).'
+    ],''),
+    DAY_PER_OUT,DAY_HOME],
+  pros:['매일 진짜 침대와 화장실, 짐은 두 번만 옮김','운전이 가장 적음(약 960km, 가장 긴 날 3시간)','쿼카·스노클(로트네스트) + 와인·동굴·서핑(마가렛 리버) + 퍼스 밤까지 골고루','토요일 밤 퍼스 시내 바 거리(노스브리지)를 제대로 놂'],
+  cons:['피너클스·칼바리 같은 "와!" 풍경이 빠짐','캐빈값이 1박 200~370 AUD로 숙박비가 가장 큼(총액은 같음)','로트네스트 캐빈은 비싸서(746 AUD+) 당일치기만','4명 짐이 7인승 3열 접어야 들어감']
+};
+var OPTS=[OPT1,OPT2,OPT3];
+OPTS.forEach(function(o){o.flights=FLIGHTS;o.sky=SKY;});
+
+// ===== 렌더링 =====
+var cur=0,map,layer,mapMode='sky';
+function renderTabs(){
+  var h='';OPTS.forEach(function(o,i){h+='<button class="'+(i===cur?'on':'')+'" onclick="pick('+i+')">'+o.name+' · '+o.tag+'<small>'+o.sub+'</small></button>';});
+  document.getElementById('tabs').innerHTML=h;
+}
+function flLine(f){
+  var c=AIR[f.al].c; var sameDay=f.ad===f.day;
+  var arr=(sameDay?'':f.ad.replace(/^0/,'').replace('/0','/')+' ')+f.arr+' 도착';
+  return '<div class="fl" style="border-left-color:'+c+'"><b>'+f.dep+' '+f.f+'→'+f.t+'</b><span>'+arr+' · '+f.no+' · '+f.load+'</span></div>';
+}
+function renderCal(o){
+  var h='';['월','화','수','목','금','토','일'].forEach(function(w){h+='<div class="wd">'+w+'</div>';});
+  WEEKS.forEach(function(wk){wk.forEach(function(d){
+    var on=TRIP.indexOf(d)>=0;
+    var dn=d.replace(/^0/,'').replace('/0','/');
+    if(!on){h+='<div class="cell off"><div class="dn">'+dn+'</div></div>';return;}
+    var fls=o.flights.filter(function(f){return f.day===d;});
+    h+='<div class="cell"><div class="dn"><span>'+dn+'</span><span class="sleep">🛏 '+(o.sleep[d]||'')+'</span></div>';
+    fls.forEach(function(f){h+=flLine(f);});
+    if(!fls.length){h+='<div class="fl drive"><b>🚐 '+(o.drive&&o.drive[d]||'현지')+'</b></div>';}
+    h+='</div>';
+  });});
+  document.getElementById('cal').innerHTML=h;
+  var l='';TRIP.forEach(function(d){
+    var dn=d.replace(/^0/,'').replace('/0','/');
+    var fls=o.flights.filter(function(f){return f.day===d;});
+    l+='<div class="row"><div class="d">'+dn+'<small>'+WD[d]+' · 🛏 '+(o.sleep[d]||'')+'</small></div><div class="fls">';
+    if(fls.length){fls.forEach(function(f){l+=flLine(f);});}
+    else {l+='<span style="color:var(--mute)">비행 없음 · 현지</span>';}
+    l+='</div></div>';
+  });
+  document.getElementById('callist').innerHTML=l;
+  var g='';Object.keys(AIR).forEach(function(k){g+='<span><i style="background:'+AIR[k].c+'"></i>'+AIR[k].n+' ('+k+')</span>';});
+  g+='<span>🛏 = 그날 밤 자는 곳</span><span>시각 = 그 도시 현지 시간 (퍼스는 시드니보다 3시간 느림)</span>';
+  document.getElementById('legend').innerHTML=g;
+}
+function renderDays(o){
+  var h='';o.days.forEach(function(d){
+    h+='<div class="day '+d.cls+'"><div class="dh"><span class="dt">'+d.d+'</span> '+d.t;
+    d.pills.forEach(function(p){h+=' <span class="pill '+(p[1]||'')+'">'+p[0]+'</span>';});
+    h+='</div><ul>';d.items.forEach(function(it){h+='<li>'+it+'</li>';});h+='</ul>';
+    if(d.tip)h+='<div class="tip">💡 '+d.tip+'</div>';
+    h+='</div>';
+  });
+  document.getElementById('days').innerHTML=h;
+}
+function renderPC(o){
+  var h='<div><h4>👍 좋은 점</h4><ul>';o.pros.forEach(function(p){h+='<li>'+p+'</li>';});h+='</ul></div>';
+  h+='<div><h4>👎 아쉬운 점</h4><ul>';o.cons.forEach(function(p){h+='<li>'+p+'</li>';});h+='</ul></div>';
+  document.getElementById('pc').innerHTML=h;
+}
+// ----- 지도 -----
+function gc(a,b,n){ // 두 공항 사이 큰원(지구 둥근 길) 점 n개
+  var toR=Math.PI/180,toD=180/Math.PI;
+  var la1=a.lat*toR,lo1=a.lng*toR,la2=b.lat*toR,lo2=b.lng*toR;
+  var d=2*Math.asin(Math.sqrt(Math.pow(Math.sin((la1-la2)/2),2)+Math.cos(la1)*Math.cos(la2)*Math.pow(Math.sin((lo1-lo2)/2),2)));
+  var pts=[],prev=null;
+  for(var i=0;i<=n;i++){var f=i/n;var A=Math.sin((1-f)*d)/Math.sin(d),B=Math.sin(f*d)/Math.sin(d);
+    var x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2),y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2),z=A*Math.sin(la1)+B*Math.sin(la2);
+    var lat=Math.atan2(z,Math.sqrt(x*x+y*y))*toD,lng=Math.atan2(y,x)*toD;
+    if(prev!==null){while(lng-prev>180)lng-=360;while(prev-lng>180)lng+=360;}
+    prev=lng;pts.push([lat,lng]);}
+  return pts;
+}
+function showSky(o){
+  layer=L.layerGroup().addTo(map);var bounds=[];var seen={};
+  o.sky.forEach(function(leg,i){
+    var a=AP[leg[0]],b=AP[leg[1]];var pts=gc(a,b,40);
+    // 같은 두 도시를 오가는 선이 겹치지 않게 살짝 비켜 그림
+    if(i>=2){pts=pts.map(function(p){return [p[0]-0.6,p[1]+0.6];});}
+    L.polyline(pts,{color:AIR[leg[2]].c,weight:3,opacity:.85,dashArray:i>=2?'8,6':null}).addTo(layer);
+    pts.forEach(function(p){bounds.push(p);});
+    [[leg[0],[a.lat,a.lng]],[leg[1],[b.lat,b.lng]]].forEach(function(x){
+      if(seen[x[0]])return;seen[x[0]]=1;
+      L.marker(x[1],{icon:L.divIcon({html:'<div class="aplabel">'+x[0]+' '+AP[x[0]].n+'</div>',className:'',iconSize:null,iconAnchor:[-6,10]})}).addTo(layer);
+      L.circleMarker(x[1],{radius:5,color:'#333',fillColor:'#fff',fillOpacity:1,weight:2}).addTo(layer);
+    });
+  });
+  map.fitBounds(bounds,{padding:[20,20],animate:false});
+  document.getElementById('mapnote').textContent='하늘길: 인천→시드니(아시아나 실선) → 퍼스(콴타스) → 시드니(콴타스 점선) → 인천(대한항공 점선 · 아시아나는 같은 길). 선 색 = 항공사.';
+}
+function showPts(pts,title){
+  layer=L.layerGroup().addTo(map);var line=[],bounds=[];var zones={};
+  pts.forEach(function(p,i){
+    var col=C[p.z]||'#555';zones[p.z]=1;
+    var ic=L.divIcon({html:'<div class="num" style="background:'+col+'">'+(i+1)+'</div>',className:'',iconSize:[24,24],iconAnchor:[12,12]});
+    L.marker([p.lat,p.lng],{icon:ic}).addTo(layer).bindPopup('<div class="pop"><b>'+(i+1)+'. '+p.name+'</b><br><span class="m">'+p.day+' · '+ZONE[p.z]+'</span><br>'+(p.memo||'')+'</div>');
+    line.push([p.lat,p.lng]);bounds.push([p.lat,p.lng]);
+  });
+  L.polyline(line,{color:'#555',weight:2,opacity:.5,dashArray:'6,6'}).addTo(layer);
+  map.fitBounds(bounds,{padding:[30,30],animate:false});
+  var lg=Object.keys(zones).map(function(z){return '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><i style="width:11px;height:11px;border-radius:50%;background:'+C[z]+';display:inline-block"></i>'+ZONE[z]+'</span>';}).join('');
+  document.getElementById('mapnote').innerHTML=title+' · 번호 순서로 돕니다. '+lg;
+}
+function setMap(mode){
+  mapMode=mode;var o=OPTS[cur];
+  if(layer){map.removeLayer(layer);layer=null;}
+  if(mode==='sky')showSky(o);else if(mode==='syd')showPts(SYD_PTS,'시드니 하루(11/25)');else showPts(o.land,'서호주 동선 · '+o.tag);
+  var b='';[['sky','✈ 하늘길'],['syd','🏙 시드니 하루'],['land','🚐 서호주 동선']].forEach(function(x){b+='<button class="'+(x[0]===mode?'on':'')+'" onclick="setMap(\''+x[0]+'\')">'+x[1]+'</button>';});
+  document.getElementById('mapbtns').innerHTML=b;
+}
+function pick(i){
+  cur=i;var o=OPTS[i];renderTabs();renderCal(o);renderDays(o);renderPC(o);
+  var sb=document.getElementById('sumbar');if(!sb){sb=document.createElement('div');sb.id='sumbar';sb.className='bar';document.getElementById('tabs').insertAdjacentElement('afterend',sb);}
+  sb.innerHTML='📌 '+o.summary;
+  setMap(mapMode);
+  try{localStorage.setItem('wa3opt',String(i));}catch(e){}
+}
+map=L.map('map',{scrollWheelZoom:false,minZoom:2,worldCopyJump:false});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+var saved=0;try{saved=parseInt(localStorage.getItem('wa3opt')||'0',10)||0;}catch(e){}
+pick(saved);
+</script>
+</body>
+</html>
